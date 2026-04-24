@@ -75,7 +75,7 @@ int authenticateAdmin(){
             printf("%c",'*');
         }
         password[i]='\0';
-        if((strcmp(password,"YASH"))!=0)
+        if((strcmp(password,"yash"))!=0)
             return 0;
     }
     return 1;
