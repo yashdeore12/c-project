@@ -3,344 +3,215 @@
 #include<string.h>
 #include<stdlib.h>
 
-struct currentValidID{
-    int year;
-    char branch[6];
-    int totalVoters;
-};
-typedef struct candidate{
-    int cid;
-    char cname[20];
-    int votes;
-}CANDIDATE;
+// -------------------------------------------------------
+//  DATA STRUCTURES
+// -------------------------------------------------------
+typedef struct {
+    int  cid;
+    char cname[30];
+    int  votes;
+} CANDIDATE;
 
-//GLOBALS --------------------------------------------------------
-struct currentValidID currentValidID; //stores current Valid user ID parameters
-CANDIDATE candidateArray[20]; //to store information all candidates
-int numberOfCandidates; //Total number of candidates standing for election
-char studentVotes[200]; //to store information of votes given by each student
-//----------------------------------------------------------------
+// -------------------------------------------------------
+//  GLOBALS  (all in-memory, nothing saved to disk)
+// -------------------------------------------------------
+CANDIDATE candidateArray[20];   // max 20 candidates
+int       numberOfCandidates = 0;
+int       totalVoters        = 0;
+char      studentVotes[200];    // '0' = not voted, '1'..'9' = voted for that candidate
+int       electionReady      = 0; // 1 after admin sets up the election
 
-//To extract year from userID -- For example, userID:2018btecs00064 year:2018 
-int extractYear(char userID[15])
-{
-    int year=0;
-    char tmp;
-    for(int i=0;i<4;i++){
-        tmp=userID[i];
-		year=(year*10)+(tmp-48);
-    }
-    return year;
-}
+// -------------------------------------------------------
+//  ADMIN AUTHENTICATION
+// -------------------------------------------------------
+int authenticateAdmin() {
+    char username[20], password[10];
 
-int extractRollNo(char userID[15])
-{
-    int rollno=0;
-    char tmp;
-    for(int i=9;i<14;i++){
-        tmp=userID[i];
-		rollno=(rollno*10)+(tmp-48);
-    }
-    return rollno;
-}
-
-//Will check whether the global branch code and inputed branch code is matching or not
-int checkBranchCode(char userID[15])
-{
-    char branchCode[6];
-    for(int i=4;i<9;i++){
-        branchCode[i-4]=userID[i];
-    }
-    branchCode[5]='\0';
-    if(strcmp(branchCode,currentValidID.branch)==0)
-        return 1;
-    else
+    printf("\n  Enter username : ");
+    scanf("%s", username);
+    if (strcmp(username, "admin") != 0)
         return 0;
-}
 
-int authenticateAdmin(){
-    char username[15], password[6];
-    
-    printf("\nEnter username: ");
-    scanf("%s",username);
-    if((strcmp(username,"YASH"))!=0)
-        return 0;
-    else
-    {
-        printf("Enter Password: ");
-        int i=0;
-        for(i=0;i<4;i++)
-        {
-            password[i]=getch();
-            printf("%c",'*');
-        }
-        password[i]='\0';
-        if((strcmp(password,"YASH"))!=0)
-            return 0;
+    printf("  Enter password : ");
+    int i = 0;
+    for (i = 0; i < 5; i++) {
+        password[i] = getch();
+        printf("*");
     }
+    password[i] = '\0';
+
+    if (strcmp(password, "admin") != 0)
+        return 0;
+
     return 1;
 }
 
+// -------------------------------------------------------
+//  SETUP A NEW ELECTION
+// -------------------------------------------------------
+void initiateNewElection() {
+    printf("\n\n--- New Election Setup ---\n");
 
+    printf("Total number of voters  : ");
+    scanf("%d", &totalVoters);
 
-void createCandidateFiles(){
-    printf("\nCreating candidate files...\n");
-    FILE *fp;
-	char filename[20];
-    for(int i = 1;i <= numberOfCandidates; i++){
-        sprintf(filename,"candidate%d.txt",i);
-		fp=fopen(filename,"w");
-        fprintf(
-            fp,"0\n%s",
-            candidateArray[i-1].cname
-        );
-		fclose(fp);
-    }
-    printf("Created Files successfully\n");
-}
+    printf("Number of candidates    : ");
+    scanf("%d", &numberOfCandidates);
 
-
-
-int getWinner(){
-    int maxV = -1;
-    int winnerCid;
-    for(int i = 0;i < numberOfCandidates; i++){
-        if(candidateArray[i].votes > maxV) {
-            winnerCid = candidateArray[i].cid;
-            maxV = candidateArray[i].votes;      
-        }
-        else if(candidateArray[i].votes == maxV) {
-            return -1;
-        }
-    }
-    return winnerCid;
-}
-
-void initiateNewElection()
-{
-    printf("\nNew Election Initiation:\n");
-    
-    printf("\nElections for which Year: ");
-    scanf("%d",&currentValidID.year);
-    printf("Enter branch code:");
-    scanf("%s",currentValidID.branch);
-    printf("Enter max roll no.:");
-    scanf("%d",&currentValidID.totalVoters);
-    printf("Enter the no. of candidates:");
-    scanf("%d",&numberOfCandidates);
-
-   for (int i = 0; i < currentValidID.totalVoters; i++)
-    {
+    // Reset votes
+    for (int i = 0; i < totalVoters; i++)
         studentVotes[i] = '0';
+
+    for (int i = 0; i < numberOfCandidates; i++) {
+        candidateArray[i].cid   = i + 1;
+        candidateArray[i].votes = 0;
+        printf("Name of candidate %d    : ", i + 1);
+        scanf(" %[^\n]", candidateArray[i].cname);
     }
 
-    for (int i = 0;i < numberOfCandidates; i++)
-    {
-        candidateArray[i].cid=i+1;
-        printf("Enter name of candidate %d: ",i+1);
-        scanf(" %s",candidateArray[i].cname);
-        candidateArray[i].votes=0;
-    }
-    return;
+    electionReady = 1;
+    printf("\nElection is ready! Students can now vote.\n");
 }
 
-void saveElectionInfoInFile(){
-    printf("Saving Election Info in File...\n");
-    FILE *fp = fopen("ElectionInfo.txt", "w");
-    if(fp==NULL)
-    {
-        printf("\nError in file creation\n");
-        fclose(fp);
+// -------------------------------------------------------
+//  RESULTS
+// -------------------------------------------------------
+void showResults() {
+    if (!electionReady) {
+        printf("\n  No election has been set up yet!");
+        getch();
         return;
     }
-    fprintf(
-        fp,"%d\n%s\n%d\n%d",
-        currentValidID.year,
-        currentValidID.branch,
-        currentValidID.totalVoters,
-        numberOfCandidates
-    );
-    fclose(fp);
-    printf("Saved Successfully : )");
-}
 
-void loadElectionInfoFromFile()
-{
-    FILE *f1,*f2;
-    f1=fopen("ElectionInfo.txt","r");
-    if(f1==NULL)
-        printf("Not Exist");
-    fscanf(f1,"%d",&currentValidID.year);
-    fseek(f1,2,SEEK_CUR);
-    fscanf(f1,"%s",currentValidID.branch);
-    fseek(f1,2,SEEK_CUR);
-    fscanf(f1,"%d",&currentValidID.totalVoters);
-    fseek(f1,2,SEEK_CUR);
-    fscanf(f1,"%d",&numberOfCandidates);
-    fclose(f1);
-   
-    //load candidates info and student votes
-    for (int i = 0; i < currentValidID.totalVoters; i++)
-    {
-        studentVotes[i] = '0';
-    }
-    for(int i=1;i<=numberOfCandidates;i++)
-    {
-        int location;
-        char filename[20];
-        sprintf(filename,"candidate%d.txt",i);
-        f2=fopen(filename,"r+");
-        candidateArray[i-1].cid=i;
-        fscanf(f2,"%d",&candidateArray[i-1].votes);
-        fscanf(f2,"%s",candidateArray[i-1].cname);
-        while(!feof(f2)){
-            fscanf(f2,"%d",&location);
-            studentVotes[location-1] = i+48;
-        }
-        fclose(f2);
-    }
+    int totalVoted = 0;
+    int maxVotes   = -1;
+    int winnerId   = -1;
+    int tie        = 0;
 
-    
-}
+    printf("\n\n========== ELECTION RESULTS ==========\n");
+    for (int i = 0; i < numberOfCandidates; i++) {
+        printf("  %d. %-20s -> %d vote(s)\n",
+               candidateArray[i].cid,
+               candidateArray[i].cname,
+               candidateArray[i].votes);
+        totalVoted += candidateArray[i].votes;
 
-void adminPanel()
-{
-    while(1){
-        
-        if(authenticateAdmin()!=1){
-            printf("\n Wrong Username or Password \n");            
-            break;
-        }
-
-        printf("\n\nLOGGED IN SUCCESSFULLY (Press Enter)");
-		getch();
-
-        while(1)
-        {
-            char input;
-            int WinnerCid, totalVotedNow=0;
-            printf("\n1.New Election\n2.Continue Previous Election\n3.Result\n4.Logout\nOption:");
-			scanf(" %c",&input);
-
-            switch(input)
-            {
-                case '1':
-                    initiateNewElection();
-                    saveElectionInfoInFile();
-                    createCandidateFiles();
-                    break;
-                case '2':
-                    loadElectionInfoFromFile();
-                    break;
-                case '3':
-                    WinnerCid = getWinner();
-                    if(WinnerCid != -1){
-                        printf("\nWinner is %s with %d votes\n",candidateArray[WinnerCid-1].cname,candidateArray[WinnerCid-1].votes);
-                    }
-                    else{
-                        printf("\nIts A TIE");
-                    }
-                    printf("\nFull Result\n");
-                    for(int i=0;i<numberOfCandidates;i++){
-                        totalVotedNow+=candidateArray[i].votes;
-                        printf("%d. %s -> %d votes\n",candidateArray[i].cid,candidateArray[i].cname,candidateArray[i].votes);
-                    }
-                    printf("\nVoting Percentage: %d %%\n\n",(totalVotedNow*100)/currentValidID.totalVoters);
-                    break;
-                case '4':
-                    return;
-                default:
-                    printf("Invalid Option");
-					getch();
-            }
-			
+        if (candidateArray[i].votes > maxVotes) {
+            maxVotes = candidateArray[i].votes;
+            winnerId = i;
+            tie      = 0;
+        } else if (candidateArray[i].votes == maxVotes) {
+            tie = 1;
         }
     }
 
-};
+    printf("--------------------------------------\n");
+    printf("  Total votes cast : %d / %d\n", totalVoted, totalVoters);
+    if (totalVoters > 0)
+        printf("  Voting percentage: %d%%\n", (totalVoted * 100) / totalVoters);
 
-
-int isValid(char userID[15])
-{
-    if(strlen(userID)!=14)
-        return 0;
-    
-    int inputedYear=extractYear(userID);
-    int inputedRollNo = extractRollNo(userID);
-    
-    if(inputedYear!=currentValidID.year || checkBranchCode(userID)!=1 || inputedRollNo>currentValidID.totalVoters)
-        return 0;
-
-    return 1;
+    printf("--------------------------------------\n");
+    if (tie)
+        printf("  Result : ** IT'S A TIE **\n");
+    else if (winnerId != -1)
+        printf("  Winner : %s with %d vote(s)\n",
+               candidateArray[winnerId].cname,
+               maxVotes);
+    printf("======================================\n");
+    getch();
 }
 
-int isVoted(char userID[15])
-{
-    int location=extractRollNo(userID);
-    if(studentVotes[location-1]=='0')
-        return 0;
-    else
-        return 1;
+// -------------------------------------------------------
+//  ADMIN PANEL
+// -------------------------------------------------------
+void adminPanel() {
+    if (authenticateAdmin() != 1) {
+        printf("\n  Wrong username or password!\n");
+        getch();
+        return;
+    }
+
+    printf("\n  Logged in successfully! (Press Enter)");
+    getch();
+
+    char input;
+    while (1) {
+        printf("\n\n--- Admin Menu ---");
+        printf("\n  1. Setup New Election");
+        printf("\n  2. View Results");
+        printf("\n  3. Logout");
+        printf("\n  Option: ");
+        scanf(" %c", &input);
+
+        switch (input) {
+            case '1':
+                initiateNewElection();
+                break;
+            case '2':
+                showResults();
+                break;
+            case '3':
+                return;
+            default:
+                printf("\n  Invalid option!");
+                getch();
+        }
+    }
 }
 
+// -------------------------------------------------------
+//  STUDENT PANEL
+// -------------------------------------------------------
+void studentPanel() {
+    if (!electionReady) {
+        printf("\n  Election has not been set up yet. Contact admin.\n");
+        getch();
+        return;
+    }
 
-
-void saveVote(char userID[15],char voteInput)
-{
-    char filename[20];
-    sprintf(filename,"candidate%d.txt",voteInput-48);
-    FILE *fp = fopen(filename,"r+");
-    int location=extractRollNo(userID);
-    studentVotes[location-1]=voteInput;
-    candidateArray[voteInput-49].votes++;
-    fseek(fp, 0, SEEK_SET);
-    fprintf(fp,"%d\n",candidateArray[voteInput-49].votes);
-    fseek(fp, 0, SEEK_END);
-    fprintf(fp,"\n%d",location);
-    fclose(fp);
-}
-
-
-void studentPanel()
-{
-    char userID[15];
+    int rollNo;
     char voteInput;
-    while(1)
-	{
-		printf("\n\n  To exit press 0");
-        printf("\n  Enter user ID:");
-        scanf("%s",userID);
-        if(strcmp(userID, "0")==0)
-				return;
-        if(isValid(userID)!=1)
-        {
-            printf("\n  Invalid User ID(Press Enter)");
+
+    while (1) {
+        printf("\n\n  Enter your Roll Number (0 to go back): ");
+        scanf("%d", &rollNo);
+
+        if (rollNo == 0)
+            return;
+
+        if (rollNo < 1 || rollNo > totalVoters) {
+            printf("  Invalid roll number! Valid range: 1 to %d\n", totalVoters);
             getch();
             continue;
         }
 
-        if(isVoted(userID)!=0)
-        {
-            printf("\n  Your PRN entered is already voted\n  Contact Admin for furthur query");
+        if (studentVotes[rollNo - 1] != '0') {
+            printf("  Roll No. %d has already voted!\n", rollNo);
             getch();
             continue;
         }
-        printf("\n\n  Candidates for election:");
-		for (int i = 0; i < numberOfCandidates; i++)
-        {
-            printf("\n  %d. %s",i+1,candidateArray[i].cname);
-        }
-        printf("\n\n  Your Vote(Enter Number):");
-        voteInput=getch();
-        printf("*");
-        if(voteInput-48 < 1 || voteInput-48 > numberOfCandidates)
-        {
-            printf("\nInvalid Vote\nTry Again...");
+
+        // Show candidates
+        printf("\n  --- Candidates ---\n");
+        for (int i = 0; i < numberOfCandidates; i++)
+            printf("  %d. %s\n", candidateArray[i].cid, candidateArray[i].cname);
+
+        printf("\n  Enter your vote (1-%d): ", numberOfCandidates);
+        voteInput = getch();
+        printf("%c\n", voteInput);
+
+        int choice = voteInput - '0';
+        if (choice < 1 || choice > numberOfCandidates) {
+            printf("  Invalid vote! Try again.\n");
             getch();
             continue;
         }
-        saveVote(userID,voteInput);
-        printf("\n\nThanks for your precious vote(Press Enter)");
+
+        // Record the vote in memory
+        studentVotes[rollNo - 1] = voteInput;
+        candidateArray[choice - 1].votes++;
+
+        printf("\n  Vote recorded successfully! Thank you.\n");
         getch();
     }
-};
+}
